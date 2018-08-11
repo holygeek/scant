@@ -26,7 +26,9 @@ char *usage = "NAME\n"
 "    -q\n"
 "        Do not print filenames.\n\n"
 "EXIT STATUS\n"
-"    0 if at least one of the files is sparse, 1 otherwise.\n"
+"    0 if at least one of the files is sparse.\n"
+"    1 if there are no sparse files, or one of the files is empty.\n"
+"    2 if there was an error.\n"
 ;
 
 void print_usage() {
@@ -90,7 +92,8 @@ int main(int argc, char *argv[])
 	}
 	//printf("DEBUG total %d files\n", argc-i);
 
-	int ret = 0;
+	int err = 0;
+	int hasSparse = 0;
 	struct stat buf;
 	for (; i < argc; i++) {
 		int fd = open(argv[i], O_RDONLY);
@@ -117,8 +120,8 @@ int main(int argc, char *argv[])
 		if (nholes < 0) {
 			// uh-oh something's not right
 			printf("%s\n", argv[i]);
-			if (ret == 0) {
-				ret = 1;
+			if (err == 0) {
+				err = 1;
 			}
 			continue;
 		}
@@ -127,9 +130,13 @@ int main(int argc, char *argv[])
 			if (!quiet) {
 				printf("%6.2f%% %s\n", 100.0*nholes/buf.st_size, argv[i]);
 			}
-		} else if (ret == 0) {
-			ret = 1;
+			if (!hasSparse) {
+				hasSparse = 1;
+			}
 		}
 	}
-	return ret;
+	if (err) {
+		return 2;
+	}
+	return !hasSparse;
 }

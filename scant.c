@@ -15,7 +15,7 @@ char *usage = "NAME\n"
 "    %s [-h] [-a] [-q] <files>...\n"
 "\n"
 "DESCRIPTION\n"
-"    Report whether files are sparse. For each sparse file prints the\n"
+"    Report whether files are sparse, or empty. For each sparse file prints the\n"
 "    percentage of sparse content.\n"
 "\n"
 "OPTIONS\n"
@@ -106,6 +106,7 @@ int main(int argc, char *argv[])
 		}
 
 		if (buf.st_size == 0) {
+			printf("%7d %s\n", 0, argv[i]);
 			close(fd);
 			continue;
 		}

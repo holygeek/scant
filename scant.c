@@ -109,7 +109,9 @@ int main(int argc, char *argv[])
 		}
 
 		if (buf.st_size == 0) {
-			printf("%7d %s\n", 0, argv[i]);
+			if (!quiet) {
+				printf("%7d %s\n", 0, argv[i]);
+			}
 			close(fd);
 			continue;
 		}

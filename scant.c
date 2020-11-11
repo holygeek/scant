@@ -112,6 +112,9 @@ int main(int argc, char *argv[])
 			if (!quiet) {
 				printf("%7d %s\n", 0, argv[i]);
 			}
+			if (!hasSparse) {
+				hasSparse = 1;
+			}
 			close(fd);
 			continue;
 		}

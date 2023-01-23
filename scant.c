@@ -31,6 +31,9 @@ char *usage = "NAME\n"
 "    2 if there was an error.\n"
 ;
 
+int opt_quiet = 0;
+int opt_all = 0;
+
 void print_usage() {
 	printf(usage, name, name);
 
@@ -64,21 +67,67 @@ off_t count_holes(int fd, size_t size) {
 	return nholes;
 }
 
+#define EMPTY -3
+
+// is_sparse returns:
+// 0 if file is 0 bytes
+// -1 if file is not sparse
+// -2 on error
+// -3 if file is empty
+// N where N is number of sparse "holes" found in file
+int is_sparse(char *filename) {
+	int fd = open(filename, O_RDONLY);
+	if (fd < 0) {
+		perror(filename);
+		return -2;
+	}
+
+	struct stat st;
+	if (fstat(fd, &st) < 0) {
+		perror(filename);
+		close(fd);
+		return -2;
+	}
+
+
+	if (st.st_size == 0) {
+		if (!opt_quiet) {
+			printf("%7d %s\n", 0, filename);
+		}
+		close(fd);
+		return EMPTY;
+	}
+
+
+	off_t nholes = count_holes(fd, st.st_size);
+	close(fd);
+	if (nholes < 0) {
+		// uh-oh something's not right
+		printf("%s\n", filename);
+		return -2;
+	}
+
+	if (nholes > 0 || opt_all) {
+		if (!opt_quiet) {
+			printf("%6.2f%% %s\n", 100.0*nholes/st.st_size, filename);
+		}
+	}
+	return nholes;
+}
+
 int main(int argc, char *argv[])
 {
 	int i;
-	int quiet = 0;
-	int all = 0;
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-h")) {
 			print_usage();
 			return 0;
 		}
 		if (!strcmp(argv[i], "-a")) {
-			all = 1;
+			opt_all = 1;
 		}
 		if (!strcmp(argv[i], "-q")) {
-			quiet = 1;
+			opt_quiet = 1;
 		}
 		if (argv[i][0] != '-') {
 			break;
@@ -94,50 +143,24 @@ int main(int argc, char *argv[])
 
 	int err = 0;
 	int hasSparse = 0;
-	struct stat buf;
 	for (; i < argc; i++) {
-		int fd = open(argv[i], O_RDONLY);
-		if (fd < 0) {
-			perror(argv[i]);
-			continue;
-		}
-
-		if (fstat(fd, &buf) < 0) {
-			perror(argv[i]);
-			close(fd);
-			return -1;
-		}
-
-		if (buf.st_size == 0) {
-			if (!quiet) {
-				printf("%7d %s\n", 0, argv[i]);
-			}
-			if (!hasSparse) {
-				hasSparse = 1;
-			}
-			close(fd);
-			continue;
-		}
-
-
-		off_t nholes = count_holes(fd, buf.st_size);
-		close(fd);
-		if (nholes < 0) {
-			// uh-oh something's not right
-			printf("%s\n", argv[i]);
-			if (err == 0) {
-				err = 1;
-			}
-			continue;
-		}
-
-		if (nholes > 0 || all) {
-			if (!quiet) {
-				printf("%6.2f%% %s\n", 100.0*nholes/buf.st_size, argv[i]);
-			}
-			if (!hasSparse) {
-				hasSparse = 1;
-			}
+		switch (is_sparse(argv[i])) {
+			case -1: break;
+			case -2:
+				 if (err == 0)
+					 err = 1;
+				 break;
+			case EMPTY:
+				 // treat empty file as sparse
+				 hasSparse = 1;
+				 break;
+			case 0:
+				 /* empty */
+				 break;
+			default:
+				 if (!hasSparse)
+					 hasSparse = 1;
+				 break;
 		}
 	}
 	if (err) {
